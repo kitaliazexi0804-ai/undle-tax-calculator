@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: bundle-tax-calculator
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
