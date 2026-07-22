@@ -1,0 +1,19 @@
+{
+  "name": "bundle-tax-calculator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "组合装税费测算在线工具",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "vinxi build",
+    "health": "node -e \"fetch('http://localhost:' + (process.env.PORT || 4188) + '/api/health').then(r => r.json()).then(console.log)\""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "vinxi": "^0.5.8"
+  }
+}

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>组合装税费测算工具</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="topbar" aria-label="工具标题">
+        <div>
+          <span class="kicker">BUNDLE TAX</span>
+          <h1>组合装税费测算工具</h1>
+        </div>
+        <div class="topbar-actions">
+          <button id="languageToggle" type="button"><span>中</span> 한국어</button>
+          <button id="addScenarioBtn" class="primary" type="button"><span>+</span> 新建组合装</button>
+          <button id="copyBtn" type="button"><span>□</span> 复制结果</button>
+          <button id="exportBtn" type="button"><span>↓</span> 导出 CSV</button>
+          <button id="resetBtn" type="button"><span>↺</span> 重置</button>
+        </div>
+      </section>
+
+      <section class="tax-reference" aria-label="税率规则参考">
+        <div>
+          <span>税率规则参考</span>
+          <strong>固定规则，不需要填写</strong>
+        </div>
+        <div>
+          <span>化妆品</span>
+          <strong>单位容量售价 ≥ 10：23.05%</strong>
+        </div>
+        <div>
+          <span>面膜</span>
+          <strong>单位容量售价 ≥ 15：23.05%</strong>
+        </div>
+        <div>
+          <span>其他 / 未达阈值</span>
+          <strong>9.10%</strong>
+        </div>
+      </section>
+
+      <section class="scenario-panel" aria-label="组合装方案概览">
+        <div class="scenario-head">
+          <div>
+            <span class="section-label">组合装方案</span>
+            <strong id="scenarioCount">0 个方案</strong>
+          </div>
+        </div>
+        <div id="scenarioList" class="scenario-list"></div>
+      </section>
+
+      <section class="compare-panel" aria-label="组合方案对比">
+        <div class="panel-title">
+          <strong>组合方案对比</strong>
+          <span>所有组合装放在同一页，底部这里做快速汇总</span>
+        </div>
+        <div class="table-wrap">
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th>组合名称</th>
+                <th>商品数</th>
+                <th>组合实际售价</th>
+                <th>原售价合计</th>
+                <th>结算税金合计</th>
+                <th>综合税率</th>
+              </tr>
+            </thead>
+            <tbody id="compareRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <template id="scenarioTemplate">
+      <article class="scenario-card">
+        <div class="scenario-card-head">
+          <label class="scenario-name">
+            <span>组合名称</span>
+            <input data-scenario-field="name" type="text" />
+          </label>
+          <div class="scenario-actions">
+            <button data-action="duplicateScenario" type="button"><span>⧉</span> 复制此组合</button>
+            <button data-action="deleteScenario" type="button"><span>×</span> 删除组合</button>
+          </div>
+        </div>
+
+        <div class="scenario-grid">
+          <label class="summary-price">
+            <span>当前组合链接实际售价</span>
+            <input data-scenario-field="bundlePrice" type="number" min="0" step="0.01" placeholder="很重要，必填！" />
+          </label>
+          <div class="scenario-mini-summary" aria-label="当前组合小结">
+            <div>
+              <span>原售价合计</span>
+              <strong data-output="totalListPrice">0.00</strong>
+            </div>
+            <div>
+              <span>税金合计</span>
+              <strong data-output="totalTax">0.00</strong>
+            </div>
+          </div>
+        </div>
+
+        <section class="table-panel" aria-label="当前组合商品明细">
+          <div class="panel-title">
+            <strong>当前组合商品明细</strong>
+            <button class="primary" data-action="addRow" type="button"><span>+</span> 添加商品</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>产品名</th>
+                  <th>产品类型</th>
+                  <th>单件售价</th>
+                  <th>单件克重(g)</th>
+                  <th>数量</th>
+                  <th>售价合计</th>
+                  <th>占比</th>
+                  <th>实际结算售价</th>
+                  <th>合计克重(g)</th>
+                  <th>单位容量售价</th>
+                  <th>结算税率</th>
+                  <th>结算税金</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody data-role="productRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </article>
+    </template>
+
+    <template id="rowTemplate">
+      <tr>
+        <td><input data-field="name" type="text" placeholder="例如：产品 A" /></td>
+        <td>
+          <select data-field="category" aria-label="产品类型">
+            <option value="cosmetics">化妆品</option>
+            <option value="maskpack">面膜</option>
+            <option value="other">其他</option>
+          </select>
+        </td>
+        <td><input data-field="price" type="number" min="0" step="0.01" /></td>
+        <td><input data-field="weight" type="number" min="0" step="0.01" /></td>
+        <td><input data-field="quantity" type="number" min="0" step="1" /></td>
+        <td data-output="linePrice">0.00</td>
+        <td data-output="share">0.00%</td>
+        <td data-output="settlement">0.00</td>
+        <td data-output="lineWeight">0.00</td>
+        <td data-output="unitPrice">0.00</td>
+        <td data-output="taxRate">0.00%</td>
+        <td data-output="tax">0.00</td>
+        <td><button class="icon-button" data-action="removeRow" type="button" title="删除本行">×</button></td>
+      </tr>
+    </template>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
