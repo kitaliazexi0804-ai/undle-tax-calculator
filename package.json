@@ -7,13 +7,11 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "build": "vinxi build",
+    "build": "node build-static.js",
     "health": "node -e \"fetch('http://localhost:' + (process.env.PORT || 4188) + '/api/health').then(r => r.json()).then(console.log)\""
   },
   "engines": {
     "node": ">=18"
   },
-  "dependencies": {
-    "vinxi": "^0.5.8"
-  }
+  "dependencies": {}
 }
