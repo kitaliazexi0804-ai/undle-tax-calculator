@@ -428,7 +428,7 @@ select:focus {
 
 table {
   width: 100%;
-  min-width: 1380px;
+  min-width: 1580px;
   table-layout: fixed;
   border-collapse: collapse;
 }
@@ -467,15 +467,33 @@ td:nth-child(5) {
 
 th:nth-child(n+6),
 td:nth-child(n+6) {
-  width: 74px;
+  width: 80px;
+}
+
+th:nth-child(7),
+td:nth-child(7) {
+  width: 70px;
 }
 
 th:nth-child(8),
-td:nth-child(8),
+td:nth-child(8) {
+  width: 124px;
+}
+
 th:nth-child(9),
-td:nth-child(9),
+td:nth-child(9) {
+  width: 96px;
+}
+
 th:nth-child(10),
 td:nth-child(10) {
+  width: 118px;
+}
+
+th:nth-child(11),
+td:nth-child(11),
+th:nth-child(12),
+td:nth-child(12) {
   width: 92px;
 }
 
