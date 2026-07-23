@@ -14,7 +14,13 @@
           <h1>组合装税费测算工具</h1>
         </div>
         <div class="topbar-actions">
-          <button id="languageToggle" type="button"><span>中</span> 한국어</button>
+          <button id="languageToggle" class="language-switch" type="button" aria-label="切换语言">
+            <span class="language-switch-label">语言 / Language</span>
+            <span class="language-options">
+              <span data-lang-option="zh">中文</span>
+              <span data-lang-option="ko">한국어</span>
+            </span>
+          </button>
           <button id="addScenarioBtn" class="primary" type="button"><span>+</span> 新建组合装</button>
           <button id="copyBtn" type="button"><span>□</span> 复制结果</button>
           <button id="exportBtn" type="button"><span>↓</span> 导出 CSV</button>

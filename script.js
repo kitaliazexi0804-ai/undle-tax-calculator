@@ -25,7 +25,8 @@ const languageToggle = document.querySelector("#languageToggle");
 const i18n = {
   zh: {
     title: "组合装税费测算工具",
-    nextLanguage: "한국어",
+    languageLabel: "语言 / Language",
+    languageAria: "切换语言",
     addScenario: "新建组合装",
     copyResults: "复制结果",
     copied: "已复制",
@@ -90,7 +91,8 @@ const i18n = {
   },
   ko: {
     title: "세트상품 세금 계산 도구",
-    nextLanguage: "中文",
+    languageLabel: "언어 / Language",
+    languageAria: "언어 전환",
     addScenario: "세트 추가",
     copyResults: "결과 복사",
     copied: "복사 완료",
@@ -161,6 +163,17 @@ function t() {
 
 function buttonHtml(icon, text) {
   return `<span>${icon}</span> ${text}`;
+}
+
+function renderLanguageSwitch() {
+  languageToggle.setAttribute("aria-label", t().languageAria);
+  languageToggle.innerHTML = `
+    <span class="language-switch-label">${t().languageLabel}</span>
+    <span class="language-options">
+      <span class="${state.language === "zh" ? "is-active" : ""}" data-lang-option="zh">中文</span>
+      <span class="${state.language === "ko" ? "is-active" : ""}" data-lang-option="ko">한국어</span>
+    </span>
+  `;
 }
 
 function numberValue(value) {
@@ -524,7 +537,7 @@ function applyLanguage() {
   document.documentElement.lang = state.language === "ko" ? "ko-KR" : "zh-CN";
   document.title = t().title;
   setText("h1", t().title);
-  languageToggle.innerHTML = buttonHtml(state.language === "zh" ? "中" : "한", t().nextLanguage);
+  renderLanguageSwitch();
   document.querySelector("#addScenarioBtn").innerHTML = buttonHtml("+", t().addScenario);
   document.querySelector("#copyBtn").innerHTML = buttonHtml("□", t().copyResults);
   document.querySelector("#exportBtn").innerHTML = buttonHtml("↓", t().exportCsv);
