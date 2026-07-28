@@ -31,6 +31,7 @@ const i18n = {
     copyResults: "复制结果",
     copied: "已复制",
     exportCsv: "导出 CSV",
+    exportExcel: "导出 Excel",
     reset: "重置",
     taxReference: ["税率规则参考", "固定规则，不需要填写"],
     cosmeticsRule: ["化妆品", "单位容量售价 ≥ 10：23.05%"],
@@ -73,6 +74,9 @@ const i18n = {
     copySuffix: "复制",
     summarySuffix: "汇总",
     exportFile: "组合装税费测算结果.csv",
+    excelFile: "组合装税费测算结果.xlsx",
+    excelSheetName: "组合装税费测算",
+    excelTitle: "组合装税费测算结果",
     exportHeaders: [
       "组合名称",
       "产品名",
@@ -97,6 +101,7 @@ const i18n = {
     copyResults: "결과 복사",
     copied: "복사 완료",
     exportCsv: "CSV 내보내기",
+    exportExcel: "Excel 내보내기",
     reset: "초기화",
     taxReference: ["세율 기준", "고정 기준, 입력 불필요"],
     cosmeticsRule: ["화장품", "단위 용량 판매가 ≥ 10: 23.05%"],
@@ -139,6 +144,9 @@ const i18n = {
     copySuffix: "복사",
     summarySuffix: "합계",
     exportFile: "세트상품_세금_계산_결과.csv",
+    excelFile: "세트상품_세금_계산_결과.xlsx",
+    excelSheetName: "세트상품 세금 계산",
+    excelTitle: "세트상품 세금 계산 결과",
     exportHeaders: [
       "세트명",
       "상품명",
@@ -460,6 +468,294 @@ function exportCsv() {
   URL.revokeObjectURL(url);
 }
 
+function xmlEscape(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formulaEscape(value) {
+  return String(value ?? "").replace(/"/g, '""');
+}
+
+function columnName(index) {
+  let name = "";
+  let current = index;
+  while (current > 0) {
+    const remainder = (current - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    current = Math.floor((current - 1) / 26);
+  }
+  return name;
+}
+
+function makeCell(rowIndex, columnIndex, cell = {}) {
+  const ref = `${columnName(columnIndex)}${rowIndex}`;
+  const style = cell.style ? ` s="${cell.style}"` : "";
+  if (cell.formula) {
+    return `<c r="${ref}"${style}><f>${xmlEscape(cell.formula)}</f></c>`;
+  }
+  if (cell.value === "" || cell.value == null) {
+    return "";
+  }
+  if (cell.type === "number") {
+    return `<c r="${ref}"${style}><v>${numberValue(cell.value)}</v></c>`;
+  }
+  return `<c r="${ref}" t="inlineStr"${style}><is><t>${xmlEscape(cell.value)}</t></is></c>`;
+}
+
+function makeRow(rowIndex, cells) {
+  const body = cells.map((cell, index) => makeCell(rowIndex, index + 1, cell)).join("");
+  return `<row r="${rowIndex}">${body}</row>`;
+}
+
+function excelRowsForExport() {
+  syncStateFromDom();
+  const headers = [
+    t().exportHeaders[0],
+    t().exportHeaders[1],
+    t().exportHeaders[2],
+    t().exportHeaders[3],
+    t().exportHeaders[4],
+    t().exportHeaders[5],
+    t().bundlePrice,
+    t().exportHeaders[6],
+    t().exportHeaders[7],
+    t().exportHeaders[8],
+    t().exportHeaders[9],
+    t().exportHeaders[10],
+    t().exportHeaders[11],
+    t().exportHeaders[12],
+  ];
+  const rows = [
+    [{ value: t().excelTitle, style: 1 }],
+    [],
+    headers.map((value) => ({ value, style: 1 })),
+  ];
+
+  state.scenarios.forEach((scenario) => {
+    const scenarioName = scenario.name || t().unnamedScenario;
+    const bundlePrice = String(scenario.bundlePrice ?? "").trim();
+    const firstRow = rows.length + 1;
+    scenario.rows.forEach((item) => {
+      const rowIndex = rows.length + 1;
+      rows.push([
+        { value: scenarioName },
+        { value: item.name },
+        { value: categoryLabel(item.category) },
+        { value: item.price, type: "number", style: 2 },
+        { value: item.weight, type: "number", style: 2 },
+        { value: item.quantity, type: "number", style: 2 },
+        { value: bundlePrice, type: "number", style: 2 },
+        { formula: `D${rowIndex}*F${rowIndex}`, style: 2 },
+        { formula: `IF(SUM($H$${firstRow}:$H$${firstRow + scenario.rows.length - 1})>0,H${rowIndex}/SUM($H$${firstRow}:$H$${firstRow + scenario.rows.length - 1}),0)`, style: 3 },
+        { formula: `G${rowIndex}*I${rowIndex}`, style: 2 },
+        { formula: `E${rowIndex}*F${rowIndex}`, style: 2 },
+        { formula: `IF(K${rowIndex}>0,IF(G${rowIndex}="",H${rowIndex}/K${rowIndex},J${rowIndex}/K${rowIndex}),0)`, style: 2 },
+        {
+          formula: `IF(C${rowIndex}="${formulaEscape(t().categories.cosmetics)}",IF(L${rowIndex}<${taxRules.cosmeticsThreshold},${taxRules.lowRate},${taxRules.highRate}),IF(C${rowIndex}="${formulaEscape(t().categories.maskpack)}",IF(L${rowIndex}<${taxRules.maskpackThreshold},${taxRules.lowRate},${taxRules.highRate}),${taxRules.lowRate}))`,
+          style: 3,
+        },
+        { formula: `J${rowIndex}*M${rowIndex}`, style: 2 },
+      ]);
+    });
+
+    const summaryRow = rows.length + 1;
+    const lastRow = summaryRow - 1;
+    rows.push([
+      { value: `${scenarioName} ${t().summarySuffix}`, style: 1 },
+      {},
+      {},
+      {},
+      {},
+      {},
+      { value: bundlePrice, type: "number", style: 2 },
+      { formula: `SUM(H${firstRow}:H${lastRow})`, style: 2 },
+      {},
+      { formula: `SUM(J${firstRow}:J${lastRow})`, style: 2 },
+      { formula: `SUM(K${firstRow}:K${lastRow})`, style: 2 },
+      {},
+      { formula: `IF(J${summaryRow}>0,N${summaryRow}/J${summaryRow},0)`, style: 3 },
+      { formula: `SUM(N${firstRow}:N${lastRow})`, style: 2 },
+    ]);
+    rows.push([]);
+  });
+
+  return rows;
+}
+
+function makeWorksheetXml(rows) {
+  const sheetRows = rows.map((row, index) => makeRow(index + 1, row)).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <cols>
+    <col min="1" max="1" width="18" customWidth="1"/>
+    <col min="2" max="2" width="26" customWidth="1"/>
+    <col min="3" max="3" width="14" customWidth="1"/>
+    <col min="4" max="14" width="15" customWidth="1"/>
+  </cols>
+  <sheetData>${sheetRows}</sheetData>
+</worksheet>`;
+}
+
+const crcTable = (() => {
+  const table = [];
+  for (let index = 0; index < 256; index += 1) {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    }
+    table[index] = value >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function writeUint16(target, offset, value) {
+  target[offset] = value & 0xff;
+  target[offset + 1] = (value >>> 8) & 0xff;
+}
+
+function writeUint32(target, offset, value) {
+  target[offset] = value & 0xff;
+  target[offset + 1] = (value >>> 8) & 0xff;
+  target[offset + 2] = (value >>> 16) & 0xff;
+  target[offset + 3] = (value >>> 24) & 0xff;
+}
+
+function makeZip(files) {
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  files.forEach((file) => {
+    const nameBytes = encoder.encode(file.name);
+    const data = encoder.encode(file.content);
+    const crc = crc32(data);
+    const local = new Uint8Array(30 + nameBytes.length + data.length);
+    writeUint32(local, 0, 0x04034b50);
+    writeUint16(local, 4, 20);
+    writeUint16(local, 6, 0x0800);
+    writeUint16(local, 8, 0);
+    writeUint32(local, 14, crc);
+    writeUint32(local, 18, data.length);
+    writeUint32(local, 22, data.length);
+    writeUint16(local, 26, nameBytes.length);
+    local.set(nameBytes, 30);
+    local.set(data, 30 + nameBytes.length);
+    localParts.push(local);
+
+    const central = new Uint8Array(46 + nameBytes.length);
+    writeUint32(central, 0, 0x02014b50);
+    writeUint16(central, 4, 20);
+    writeUint16(central, 6, 20);
+    writeUint16(central, 8, 0x0800);
+    writeUint16(central, 10, 0);
+    writeUint32(central, 16, crc);
+    writeUint32(central, 20, data.length);
+    writeUint32(central, 24, data.length);
+    writeUint16(central, 28, nameBytes.length);
+    writeUint32(central, 42, offset);
+    central.set(nameBytes, 46);
+    centralParts.push(central);
+    offset += local.length;
+  });
+
+  const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+  const end = new Uint8Array(22);
+  writeUint32(end, 0, 0x06054b50);
+  writeUint16(end, 8, files.length);
+  writeUint16(end, 10, files.length);
+  writeUint32(end, 12, centralSize);
+  writeUint32(end, 16, offset);
+  return new Blob([...localParts, ...centralParts, end], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+}
+
+function makeExcelBlob() {
+  const sheetXml = makeWorksheetXml(excelRowsForExport());
+  return makeZip([
+    {
+      name: "[Content_Types].xml",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`,
+    },
+    {
+      name: "_rels/.rels",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`,
+    },
+    {
+      name: "xl/workbook.xml",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="${xmlEscape(t().excelSheetName)}" sheetId="1" r:id="rId1"/></sheets>
+  <calcPr calcMode="auto"/>
+</workbook>`,
+    },
+    {
+      name: "xl/_rels/workbook.xml.rels",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`,
+    },
+    {
+      name: "xl/styles.xml",
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <numFmts count="2">
+    <numFmt numFmtId="164" formatCode="0.00"/>
+    <numFmt numFmtId="165" formatCode="0.00%"/>
+  </numFmts>
+  <fonts count="2"><font/><font><b/></font></fonts>
+  <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
+  <borders count="1"><border/></borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="4">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+    <xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+    <xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+  </cellXfs>
+  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`,
+    },
+    { name: "xl/worksheets/sheet1.xml", content: sheetXml },
+  ]);
+}
+
+function exportExcel() {
+  calculateAll();
+  const blob = makeExcelBlob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = t().excelFile;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 async function copyResults() {
   calculateAll();
   const text = tableRowsForExport().map((row) => row.join("\t")).join("\n");
@@ -543,6 +839,7 @@ function applyLanguage() {
   document.querySelector("#addScenarioBtn").innerHTML = buttonHtml("+", t().addScenario);
   document.querySelector("#copyBtn").innerHTML = buttonHtml("□", t().copyResults);
   document.querySelector("#exportBtn").innerHTML = buttonHtml("↓", t().exportCsv);
+  document.querySelector("#exportExcelBtn").innerHTML = buttonHtml("⇩", t().exportExcel);
   document.querySelector("#resetBtn").innerHTML = buttonHtml("↺", t().reset);
   applyTaxReferenceLanguage();
   setText(".section-label", t().scenarioSection);
@@ -564,6 +861,7 @@ function translateDefaultScenarioNames(fromLanguage, toLanguage) {
 
 document.querySelector("#addScenarioBtn").addEventListener("click", () => addScenario());
 document.querySelector("#exportBtn").addEventListener("click", exportCsv);
+document.querySelector("#exportExcelBtn").addEventListener("click", exportExcel);
 document.querySelector("#copyBtn").addEventListener("click", copyResults);
 document.querySelector("#resetBtn").addEventListener("click", resetAll);
 languageToggle.addEventListener("click", () => {
