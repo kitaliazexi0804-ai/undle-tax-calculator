@@ -211,6 +211,7 @@ function createScenario(name, rows = templateRows) {
 }
 
 function scenarioMetrics(scenario) {
+  const hasBundlePrice = String(scenario.bundlePrice ?? "").trim() !== "";
   const bundlePrice = numberValue(scenario.bundlePrice);
   const rows = scenario.rows.map((item) => ({
     ...item,
@@ -228,9 +229,10 @@ function scenarioMetrics(scenario) {
   const lines = rows.map((item) => {
     const linePrice = item.price * item.quantity;
     const share = totalListPrice > 0 ? linePrice / totalListPrice : 0;
-    const settlement = bundlePrice * share;
+    const settlement = hasBundlePrice ? bundlePrice * share : 0;
     const lineWeight = item.weight * item.quantity;
-    const unitPrice = lineWeight > 0 ? settlement / lineWeight : 0;
+    const rateBaseAmount = hasBundlePrice ? settlement : linePrice;
+    const unitPrice = lineWeight > 0 ? rateBaseAmount / lineWeight : 0;
     const taxRate = taxRateForCategory(item.category, unitPrice, {
       cosmeticsThreshold: taxRules.cosmeticsThreshold,
       maskpackThreshold: taxRules.maskpackThreshold,
